@@ -1,0 +1,112 @@
+[
+{
+  "fields": {
+    "name": "Кол записей данных тегов",
+    "code": "count_row_stat_tag",
+    "description": "Количество хранения записей данных тегов для каждой страны",
+    "type": "int",
+    "value": "5"
+  }
+},
+{
+  "fields": {
+    "name": "Шаблон сообщения в Telegram",
+    "code": "template_tg_message",
+    "description": "Шаблон построения данных для отправки в Telegram",
+    "type": "str",
+    "value": "channel_id\r\nchannel_name\r\nchannel_date_created\r\nchannel_country\r\n----------\r\nchannel_follower\r\nchannel_video\r\nchannel_view\r\n\r\nvideo_id\r\nvideo_name\r\nvideo_upload_date\r\nvideo_publish_date\r\nvideo_duration\r\nvideo_category\r\n---------\r\nvideo_like\r\nvideo_dislike\r\nvideo_comment\r\nvideo_view\r\n\r\nseo_data\r\n\r\ntags_data\r\nnotification_users"
+  }
+},
+{
+  "fields": {
+    "name": "Интервал между сообщениями",
+    "code": "interval_notifications",
+    "description": "Интервал в секундах между сообщениями при уведомлении в чат",
+    "type": "int",
+    "value": "5"
+  }
+},
+{
+  "fields": {
+    "created_at": "2023-12-11T19:10:19.909Z",
+    "updated_at": "2024-02-04T19:15:37.938Z",
+    "name": "Чат уведомления",
+    "code": "notification_chat_id",
+    "description": "Чат в который будет производится рассылка",
+    "type": "str",
+    "value": "-1002025684733"
+  }
+},
+{
+  "fields": {
+    "name": "Кол записей данных канала",
+    "code": "count_row_stat_channel",
+    "description": "Количество хранения записей данных канала для каждого типа",
+    "type": "int",
+    "value": "5"
+  }
+},
+{
+  "fields": {
+    "name": "Мин позиция топа видео",
+    "code": "min_top_position",
+    "description": "Минимальная позиция топа видео при анализе СЕО",
+    "type": "int",
+    "value": "1"
+  }
+},
+{
+  "fields": {
+    "name": "Кол потоков получения данных",
+    "code": "count_process_check",
+    "description": "Количество потоков для получения данных при выполнении запроса через endpoint",
+    "type": "int",
+    "value": "4"
+  }
+},
+{
+  "fields": {
+    "name": "Глубина определения позиции тега",
+    "code": "search_depth_position",
+    "description": "Глубина определения позиции тега видео",
+    "type": "int",
+    "value": "100"
+  }
+},
+{
+  "fields": {
+    "name": "Макс позиция топа видео",
+    "code": "max_top_position",
+    "description": "Максимальная позиция топа видео при анализе СЕО",
+    "type": "int",
+    "value": "30"
+  }
+},
+{
+  "fields": {
+    "name": "Пользователи уведомления",
+    "code": "notification_user_id",
+    "description": "Юзернеймы пользователей которых следует отметить при рассылки",
+    "type": "str",
+    "value": "."
+  }
+},
+{
+  "fields": {
+    "name": "Кол записей данных видео",
+    "code": "count_row_stat_video",
+    "description": "Количество хранения записей данных видео для каждого типа",
+    "type": "int",
+    "value": "5"
+  }
+},
+{
+  "fields": {
+    "name": "Кол записей данных seo",
+    "code": "count_row_stat_seo",
+    "description": "Количество хранения записей данных seo для каждой страны",
+    "type": "int",
+    "value": "5"
+  }
+}
+]
