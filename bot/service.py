@@ -1,13 +1,14 @@
-import time
-
 from .const import BASE_URL_YOUTUBE, ProxyType, CountryCodeFlagEmoji, UPDATE_MESSAGE_BUTTONS
 from aiogram.utils.keyboard import InlineKeyboardBuilder, InlineKeyboardButton
 from .models import Users, Proxy, Message, ProxySettings, session
 from youtubesearchpython import VideosSearch, Channel
 from aiogram.types import InlineKeyboardMarkup
 from sqlalchemy import update, select, delete
+from timeout_decorator import timeout
 from fake_useragent import UserAgent
 from pycountry import countries
+from pytube import YouTube
+import logging
 from aiogram import Bot
 import multiprocessing
 import requests
@@ -25,10 +26,27 @@ from .utils import (
 useragent = UserAgent()
 
 
+import requests
+from bs4 import BeautifulSoup
+
+
+async def get_video_id_from_url(url: str) -> None | str:
+    try:
+        response = requests.get(url)
+        soup = BeautifulSoup(response.text, "html.parser")
+        video_url = soup.find("meta", property="og:url").get("content", None)
+        if not video_url:
+            return
+        return video_url.split("=")[1]
+    except Exception as ex:
+        logging.error(str(ex))
+        return
+
+
 async def is_valid_url(url: str) -> bool:
     try:
         response = requests.get(url=url)
-        return BASE_URL_YOUTUBE in url and response.status_code == 200
+        return response.status_code == 200
     except requests.exceptions.MissingSchema:
         return False
 
@@ -122,6 +140,7 @@ def create_proxy(proxy_type_str: str, host: str, country_code: str, telegram_id:
     session.commit()
     session.refresh(proxy)
     is_valid_proxy(proxy)
+    # create_proxy_settings(country=country.name, user_id=user.id)
 
 
 def delete_users_proxy(host: str) -> None:
@@ -164,6 +183,20 @@ def get_proxy_settings(country: str, user_id: str) -> ProxySettings:
     return proxy_settings.scalars().all()
 
 
+def create_all_user_settings(telegram_id: int) -> None:
+    data = []
+    user = get_user(telegram_id=telegram_id)
+    all_countries = session.execute(
+        select(ProxySettings.proxy_country).distinct()
+    )
+    all_countries = list(set(all_countries.scalars().all()))
+    for country in all_countries:
+        data.append({"proxy_country": country, "user_id": str(user.id)})
+
+    session.bulk_insert_mappings(ProxySettings, data)
+    session.commit()
+
+
 def delete_proxy_settings(country: str, user_id: str) -> None:
     session.execute(
         delete(ProxySettings)
@@ -195,9 +228,6 @@ def get_proxy_countries(user_id: str) -> tuple[InlineKeyboardMarkup, dict[str, s
 
     return InlineKeyboardBuilder(keyboard_list).as_markup(), keyboard_dict
 
-import logging
-from timeout_decorator import timeout
-
 
 @timeout(45)
 async def get_yt_statistics_data(
@@ -216,11 +246,9 @@ async def get_yt_statistics_data(
             valid_proxies.append(proxy)
 
     await bot.edit_message_text(message_id=msg_id, chat_id=chat_id, text='Получаем общие данные по видео...')
-    time.sleep(1)
 
     # Получаем данные по видео из YouTube
-    logging.info("10000000000000000909877")
-    logging.info(video_id)
+    logging.info(f"Video ID: {video_id}")
     try:
         video_data = VideosSearch.data(video_id=video_id)
     except TypeError as ex:
@@ -228,42 +256,46 @@ async def get_yt_statistics_data(
         await bot.edit_message_text(message_id=msg_id, chat_id=chat_id, text='Не валидный id видео.')
         return
     except Exception as ex:
-        print(ex)
+        logging.info("=============================================================================")
+        logging.info(ex)
+        logging.info("=============================================================================")
         await bot.edit_message_text(message_id=msg_id, chat_id=chat_id, text='Не валидный статус код.')
         return
 
     data["video"] = video_data
     if valid_proxies:
-        # Проверяем наличие ключевых слов у видео
-        if video_data["keywords"]:
-            task_data = []
-            for connect in valid_proxies:
-                if is_valid_proxy(connect):
-                    for tag in video_data["keywords"]:
-                        data_hz = {
-                            "yt_id": video_id,
-                            "tag": tag,
-                            "connect": connect.__dict__
-                        }
-                        task_data.append(data_hz)
-                else:
-                    continue
+            # Проверяем наличие ключевых слов у видео
+            if video_data["keywords"]:
+                task_data = []
+                for connect in valid_proxies:
+                    if is_valid_proxy(connect):
+                        for tag in video_data["keywords"]:
+                            data_hz = {
+                                "yt_id": video_id,
+                                "tag": tag,
+                                "connect": connect.__dict__
+                            }
+                            task_data.append(data_hz)
+                    else:
+                        continue
 
-            await bot.edit_message_text(message_id=msg_id, chat_id=chat_id, text='Получаем данные по позиции тегов...')
-            time.sleep(1)
-            outputs = {}
-            with multiprocessing.Pool(settings_data("count_process_check")) as pool:
-                try:
-                    outputs = pool.map(get_position_video, task_data)
-                except Exception as ex:
-                    logging.error(str(ex))
+                await bot.edit_message_text(
+                    message_id=msg_id, chat_id=chat_id, text='Получаем данные по позиции тегов...'
+                )
+                outputs = {}
+                with multiprocessing.Pool(settings_data("count_process_check")) as pool:
+                    try:
+                        outputs = pool.map(get_position_video, task_data)
+                    except Exception as ex:
+                        logging.error(str(ex))
+                # Форматируем данные по тегам
+                tag_data = format_tag_response(outputs)
+                await bot.edit_message_text(message_id=msg_id, chat_id=chat_id, text='Анализируем данные по сео...')
+                seo = get_seo_for_tags(outputs, len(video_data["keywords"]))
+                seo_data = format_seo_response(seo)
+                data["video"]["seo"] = seo_data
+                data["video"]["tags"] = tag_data
 
-            # Форматируем данные по тегам
-            tag_data = format_tag_response(outputs)
-            await bot.edit_message_text(message_id=msg_id, chat_id=chat_id, text='Анализируем данные по сео...')
-            time.sleep(1)
-            # seo = get_seo_for_tags(outputs, len(video_data["keywords"]))
-            # seo_data = format_seo_response(seo)
             # Форматируем общую статистику по видео
             video_stat = format_video_stat_response(
                 [
@@ -274,17 +306,17 @@ async def get_yt_statistics_data(
                 ]
             )
             data["video"]["statistics"] = video_stat
-            data["video"]["tags"] = tag_data
-            # data["video"]["seo"] = seo_data
-        else:
-            # Вызываем ошибку если видео не найдено
-            return {"video": False}
+
     else:
         # Вызываем ошибку если валидные прокси не найдены
         return {"proxy": False}
 
     # Переопределяем ключи и значения для video
-    video_data["picture"] = video_data["thumbnails"][4]["url"]
+    if len(video_data["thumbnails"]) > 4:
+        thumbnails = video_data["thumbnails"][4]["url"]
+    else:
+        thumbnails = video_data["thumbnails"][-1]["url"]
+    video_data["picture"] = thumbnails
     video_data["yt_id"] = video_data["id"]
     video_data["name"] = video_data["title"]
     video_data["channel"] = video_data["channel"]["id"]
@@ -298,7 +330,6 @@ async def get_yt_statistics_data(
 
     # Получаем данные по каналу
     await bot.edit_message_text(message_id=msg_id, chat_id=chat_id, text='Получаем общие данные пок каналу...')
-    time.sleep(1)
     channel_data = Channel.data(video_data["channel"])
     # Форматируем статистику общую по каналу
     channel_stat = format_channel_stat_response(
@@ -333,5 +364,6 @@ async def get_yt_statistics_data(
         )
         return
     except Exception as ex:
+        logging.error(str(ex))
         # Вызываем ошибку если не удалось отправить сообщение в Telegram
         return {"result": False}

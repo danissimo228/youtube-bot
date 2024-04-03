@@ -77,18 +77,14 @@ def format_seo_response(data: list) -> dict:
 def get_position_video(data: dict) -> dict:
     """Функция получения позиции видео по тегу из YouTube"""
 
-    logging.error("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
     country = countries.get(name=data["connect"]["country"])
-    logging.error(country)
     country_code = country.alpha_2
-    logging.error(country_code)
 
     # Формируем прокси подключение
     proxy = {
         "all://": f'{data["connect"]["type"].value}://{data["connect"]["host"]}'
     }
     search_depth_position = settings_data("search_depth_position")
-    logging.error("9999999999999999")
     logging.error(search_depth_position)
     # Получаем позицию видео по тегу
     position = VideosSearch.position(video_id=data["yt_id"],
@@ -97,16 +93,10 @@ def get_position_video(data: dict) -> dict:
                                      limit=100,
                                      proxy=proxy,
                                      user_agent=useragent.random)
-    print("=======_++++++++")
-    logging.error(position)
-    logging.error("99999999999999998257283974237490237482374329432742")
-    logging.error(data)
+
     # Добавляем новый ключ с позицией
     data["position"] = position
     data["country"] = data["connect"]["country"]
-    logging.error("88899999098811111111-1-1-1-1-1-1-1-1-1-1-1-1-1-1-1-1")
-    logging.error(data)
-    logging.error("?????????X?X?X>X<X<X>X>?X?XX:{XX}X|X")
 
     return data
 
@@ -276,11 +266,7 @@ def template_tg_message(data: dict) -> str:
 
         # Получаем данные по стране канала
         try:
-            print("========================================================")
-            print(data)
             country_channel_data = pycountry.countries.search_fuzzy(data["channel"]["country"])
-            print(country_channel_data)
-            print(data["channel"]["country"])
             country_channel_flag = CountryCodeFlagEmoji[country_channel_data.alpha_2].value
         except Exception:
             country_channel_flag = CountryCodeFlagEmoji.UN.value
@@ -357,7 +343,6 @@ def template_tg_message(data: dict) -> str:
             if item_type == "LIKE":
                 continue
             if item["value"]:
-                print("++++++++++++++++++++++++++++++++++")
                 if "," in item["value"]:
                     value = '{0:,}'.format(int(item["value"].replace(",", ""))).replace(',', ' ')
                 else:

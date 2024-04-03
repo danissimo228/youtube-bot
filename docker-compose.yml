@@ -8,24 +8,29 @@ services:
     ports:
       - "8888:8000"
     environment:
-      - POSTGRES_HOST=db
+      - POSTGRES_HOST=postgres
       - POSTGRES_USER=${DATABASE_USER}
       - POSTGRES_PASSWORD=${DATABASE_PASSWORD}
       - POSTGRES_DB=${DATABASE_NAME}
     depends_on:
       - db
+    links:
+      - db
+
   db:
-    image: postgres:latest
-    container_name: postgres
+    image: postgres:15.1
+    container_name: postgres-youtube-bot
+    hostname: postgres
+    env_file:
+      - ".env"
     ports:
-      - 5436:${DATABASE_PORT}/tcp
+      - 127.0.0.1:${DATABASE_PORT}:5432/tcp
     environment:
       POSTGRES_PORT: ${DATABASE_PORT}
       POSTGRES_USER: ${DATABASE_USER}
       POSTGRES_PASSWORD: ${DATABASE_PASSWORD}
       POSTGRES_DB: ${DATABASE_NAME}
       POSTGRES_HOST: ${DATABASE_HOST}
-      PORT: ${DATABASE_PORT}
-
-volumes:
- postgres_data:
+    volumes:
+      - "./service/postgresql:/var/lib/postgresql/data"
+    restart: unless-stopped

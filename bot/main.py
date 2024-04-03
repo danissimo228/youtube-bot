@@ -1,3 +1,4 @@
+from .middleware import TrafficMessageMiddleware
 from aiogram import Bot, Dispatcher, Router, F
 from multiprocessing import freeze_support
 from aiogram.fsm.context import FSMContext
@@ -5,6 +6,7 @@ from aiogram.filters import CommandStart
 from .state import Form
 import logging
 import asyncio
+from pycountry import countries
 from aiogram.types import (
     Message,
     CallbackQuery,
@@ -24,6 +26,8 @@ from .service import (
     get_proxy_countries,
     create_proxy_settings,
     delete_proxy_settings,
+    get_video_id_from_url,
+    create_all_user_settings
 )
 from .const import (
     CountryCodeFlagEmoji,
@@ -36,12 +40,12 @@ from .const import (
     FOR_ADMIN_ACTION_BUTTONS,
     ADD_PROXY_ACTION_BUTTON_TEXT,
     DELETE_PROXY_ACTION_BUTTON_TEXT,
-    GET_STATISTIC_OF_VIDEO_BUTTON_TEXT,
 )
 
 
 bot = Bot(BOT_TOKEN)
 form_router = Router()
+form_router.message.middleware(TrafficMessageMiddleware())
 
 
 @form_router.message(CommandStart())
@@ -50,21 +54,22 @@ async def command_start_handler(message: Message, state: FSMContext) -> None:
     markup = ACTION_BUTTONS
     if not get_user(telegram_id=user.id):
         create_user(telegram_id=user.id, username=user.username, full_name=user.full_name)
+        create_all_user_settings(telegram_id=user.id)
     if str(user.id) in ADMIN_IDS:
         markup = FOR_ADMIN_ACTION_BUTTONS
     await state.set_state(Form.change_action)
-    await message.answer("Привет! Выбери действие.", reply_markup=markup)
+    await message.answer(f"📹 Приветcтвую {user.username}!", reply_markup=markup)
 
 
 @form_router.message(Form.change_action, F.text.lower() == SETTINGS_BUTTON_TEXT.lower())
 async def settings(message: Message, state: FSMContext) -> None:
     user = get_user(telegram_id=message.from_user.id)
     result = get_proxy_countries(user_id=user.id)
+    await state.set_state(Form.change_action)
     if not result:
         await message.answer("Нет доступных прокси.")
         return
-
-    await message.answer("Настройки", reply_markup=result[0])
+    await message.answer("⚙️ Настройки", reply_markup=result[0])
 
 
 @form_router.callback_query(lambda callback_query: callback_query.data.startswith("proxy_countries_"))
@@ -76,30 +81,37 @@ async def update_settings(callback_query: CallbackQuery) -> None:
     buttons, dict_button = result
     country_code = callback_query.data.split("_")
     country_code = country_code[2] if len(country_code) > 2 else None
-    from pycountry import countries
     country_name = [
         countries.get(alpha_2=code.name).name for code in CountryCodeFlagEmoji if code.name == country_code
     ][0]
+    checked_buttons = [button for button in dict_button.keys() if "✅" in button]
 
     for key, value in dict_button.items():
         if country_name in key:
             if "✅" in key:
+                if len(checked_buttons) == 1:
+                    continue
                 delete_proxy_settings(country=country_name, user_id=user.id)
+                await bot.edit_message_text(
+                    text=callback_query.message.text,
+                    chat_id=callback_query.message.chat.id,
+                    message_id=callback_query.message.message_id,
+                    reply_markup=get_proxy_countries(user_id=user.id)[0]
+                )
             else:
                 create_proxy_settings(country=country_name, user_id=user.id)
+                await bot.edit_message_text(
+                    text=callback_query.message.text,
+                    chat_id=callback_query.message.chat.id,
+                    message_id=callback_query.message.message_id,
+                    reply_markup=get_proxy_countries(user_id=user.id)[0]
+                )
             continue
-
-    await bot.edit_message_text(
-        text=callback_query.message.text,
-        chat_id=callback_query.message.chat.id,
-        message_id=callback_query.message.message_id,
-        reply_markup=get_proxy_countries(user_id=user.id)[0]
-    )
 
 
 @form_router.message(Form.change_action, F.text.lower() == PROXY_BUTTON_TEXT.lower())
 async def proxy_action(message: Message, state: FSMContext) -> None:
-    proxies_string = "Выберете действие:\n"
+    proxies_string = "⚙️ Выберете действие:\n"
     proxies_dict = {}
     count = 0
     proxies = get_users_proxies(telegram_id=message.from_user.id)
@@ -126,21 +138,24 @@ async def delete_proxy(message: Message, state: FSMContext) -> None:
     number = message.text
     if not number.isdigit():
         await message.answer("Не валидный номер прокси.")
+        await state.set_state(Form.change_action)
         return
 
     if int(number) <= 0:
         await message.answer("Не валидный номер прокси.")
+        await state.set_state(Form.change_action)
         return
 
     proxies = await state.get_data()
     proxy_host = proxies['change_action'].get(number, None)
     if not proxy_host:
         await message.answer("Не верный номер прокси")
+        await state.set_state(Form.change_action)
         return
     delete_users_proxy(host=proxy_host)
-    await state.set_state(Form.change_action)
     if str(message.from_user.id) in ADMIN_IDS:
         markup = FOR_ADMIN_ACTION_BUTTONS
+    await state.set_state(Form.change_action)
     await message.answer("Удаление прошло успешно.", reply_markup=markup)
 
 
@@ -159,6 +174,7 @@ async def add_proxy(message: Message, state: FSMContext) -> None:
     proxy = message.text.split("://")
     telegram_id = message.from_user.id
     if not len(proxy) > 2:
+        await state.set_state(Form.change_action)
         await message.answer("Не верный формат прокси.")
         return
 
@@ -170,48 +186,48 @@ async def add_proxy(message: Message, state: FSMContext) -> None:
         await state.set_state(Form.change_action)
         if str(telegram_id) in ADMIN_IDS:
             markup = FOR_ADMIN_ACTION_BUTTONS
-        await message.answer("Прокси успешно добавлены.", reply_markup=markup)
+        await message.answer("✅ Прокси успешно добавлены.", reply_markup=markup)
     except Exception as ex:
         await message.answer(str(ex))
+    await state.set_state(Form.change_action)
 
 
-@form_router.message(Form.change_action, F.text.lower() == GET_STATISTIC_OF_VIDEO_BUTTON_TEXT.lower())
-async def send_url(message: Message, state: FSMContext) -> None:
-    await state.set_state(Form.input_youtube_url)
-    await message.answer("Пришлите ссылку на видео.", reply_markup=ReplyKeyboardRemove())
-
-
-@form_router.message(Form.input_youtube_url)
+@form_router.message(Form.change_action)
 async def get_url(message: Message, state: FSMContext) -> None:
     url = message.text
-    if is_valid_url(url):
+    if await is_valid_url(url):
         await state.set_state(Form.get_youtube_statistics)
         msg = await message.answer("Ожидайте.")
-        video_id = url.split("=")
-        if len(video_id) > 1:
+        if await is_valid_url(url=url):
+            video_id = await get_video_id_from_url(url=url)
+            if not video_id:
+                await message.answer("Не валидный url.")
+                await state.set_state(Form.change_action)
+                return
             user = get_user(telegram_id=message.from_user.id)
             create_message(
                 value="Ожидайте.", message_id=msg.message_id, chat_id=msg.chat.id,
-                user_id=message.from_user.id, video_id=video_id[1]
+                user_id=message.from_user.id, video_id=video_id
             )
             try:
                 err = await get_yt_statistics_data(
-                    user_id=user.id, video_id=video_id[1], msg_id=msg.message_id, chat_id=msg.chat.id, bot=bot
+                    user_id=user.id, video_id=video_id, msg_id=msg.message_id, chat_id=msg.chat.id, bot=bot
                 )
             except TimeoutError:
                 await bot.edit_message_text(
                     message_id=msg.message_id, chat_id=message.chat.id, text='Ошибка! Слишком долгое ожидание.'
                 )
-            logging.error("================================================================================")
-            logging.error(err)
             if isinstance(err, dict):
+                logging.error(f"Error: {err}")
                 await bot.edit_message_text(
-                    message_id=msg.message_id, chat_id=message.chat.id, text='Ошибка! Слишком долгое ожидание.'
+                    message_id=msg.message_id, chat_id=message.chat.id, text=str(err)
                 )
         else:
             await message.answer("Не валидный url.")
     else:
         await message.answer("Не валидный url.")
+
+    await state.set_state(Form.change_action)
 
 
 @form_router.callback_query(lambda callback_query: callback_query.data == "update_message")
@@ -219,15 +235,15 @@ async def update_message(callback_query: CallbackQuery) -> None:
     message = get_message(message_id=callback_query.message.message_id, user_id=callback_query.from_user.id)
     try:
         err = await get_yt_statistics_data(
-            user_id=message.user_id, video_id=message.video_id, msg_id=message.telegram_id, chat_id=message.chat_id, bot=bot
+            user_id=message.user_id, video_id=message.video_id,
+            msg_id=message.telegram_id, chat_id=message.chat_id, bot=bot
         )
     except TimeoutError:
         await bot.edit_message_text(
             message_id=message.id, chat_id=message.chat_id, text='Ошибка! Слишком долгое ожидание.'
         )
-    logging.error("================================================================================")
-    logging.error(err)
     if isinstance(err, dict):
+        logging.error(f"Error: {err}")
         await bot.edit_message_text(
             message_id=message.id, chat_id=message.chat_id, text='Ошибка! Попробуйте еще раз.'
         )

@@ -15,30 +15,27 @@ DB_PORT = os.getenv("DATABASE_PORT")
 DB_USER = os.getenv("DATABASE_USER")
 DB_NAME = os.getenv("DATABASE_NAME")
 DB_PASSWORD = os.getenv("DATABASE_PASSWORD")
-DATABASE_URL = f"postgresql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
+# DATABASE_URL = f"postgresql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
+DATABASE_URL = f"postgresql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{5432}/{DB_NAME}"
 
 
-GET_STATISTIC_OF_VIDEO_BUTTON_TEXT = "Получить статистику видео."
-PROXY_BUTTON_TEXT = "Прокси."
-SETTINGS_BUTTON_TEXT = "Настройки"
+GET_STATISTIC_OF_VIDEO_BUTTON_TEXT = "📈 Получить статистику видео"
+PROXY_BUTTON_TEXT = "⚙️ Прокси."
+SETTINGS_BUTTON_TEXT = "⚙️ Настройки"
 
 FOR_ADMIN_ACTION_BUTTONS = ReplyKeyboardMarkup(
     resize_keyboard=True,
     keyboard=[
         [
             KeyboardButton(text=PROXY_BUTTON_TEXT),
-            KeyboardButton(text=GET_STATISTIC_OF_VIDEO_BUTTON_TEXT)
-        ],
-        [
             KeyboardButton(text=SETTINGS_BUTTON_TEXT)
-        ]
+        ],
     ]
 )
 ACTION_BUTTONS = ReplyKeyboardMarkup(
     resize_keyboard=True,
     keyboard=[
         [
-            KeyboardButton(text=GET_STATISTIC_OF_VIDEO_BUTTON_TEXT),
             KeyboardButton(text=SETTINGS_BUTTON_TEXT)
         ],
     ]
@@ -58,6 +55,7 @@ PROXY_ACTION_BUTTONS = ReplyKeyboardMarkup(
     ]
 
 )
+
 
 UPDATE_MESSAGE_BUTTONS = InlineKeyboardBuilder(
     [
